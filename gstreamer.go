@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	C.gstreamer_start_mainloop()
+	C.gstreamer_init()
 }
 
 type MessageType int
@@ -71,15 +71,17 @@ func gobool(b C.gboolean) bool {
 
 type Element struct {
 	element *C.GstElement
-	out     chan<- []byte
+	out     chan []byte
 	id      int
 }
 
 type Pipeline struct {
 	pipeline *C.GstPipeline
-	messages chan<- *Message
+	messages chan *Message
+	id       int
 }
 
+var pipelines = make(map[int]*Pipeline)
 var elements = make(map[int]*Element)
 var gstreamerLock sync.Mutex
 var gstreamerIdGenerate = 10000
@@ -91,15 +93,23 @@ func New(pipelineStr string) (*Pipeline, error) {
 	if cpipeline == nil {
 		return nil, errors.New("create pipeline error")
 	}
+
 	pipeline := &Pipeline{
 		pipeline: cpipeline,
 		messages: make(chan *Message),
 	}
+
+	gstreamerLock.Lock()
+	defer gstreamerLock.Unlock()
+	gstreamerIdGenerate += 1
+	pipeline.id = gstreamerIdGenerate
+	pipelines[pipeline.id] = pipeline
+
 	return pipeline, nil
 }
 
 func (p *Pipeline) Start() {
-	C.gstreamer_pipeline_start(p.pipeline)
+	C.gstreamer_pipeline_start(p.pipeline, C.int(p.id))
 }
 
 func (p *Pipeline) Pause() {
@@ -107,6 +117,12 @@ func (p *Pipeline) Pause() {
 }
 
 func (p *Pipeline) Stop() {
+	gstreamerLock.Lock()
+	delete(pipelines, p.id)
+	gstreamerLock.Unlock()
+	if p.messages != nil {
+		close(p.messages)
+	}
 	C.gstreamer_pipeline_stop(p.pipeline)
 }
 
@@ -128,7 +144,6 @@ func (p *Pipeline) GetDelay() uint64 {
 
 	delay := C.gstreamer_pipeline_get_delay(p.pipeline)
 	return uint64(delay)
-
 }
 
 func (p *Pipeline) SetDelay(delay uint64) {
@@ -178,7 +193,7 @@ func (e *Element) Push(buffer []byte) {
 	C.gstreamer_element_push_buffer(e.element, b, C.int(len(buffer)))
 }
 
-func (e *Element) Poll() chan<- []byte {
+func (e *Element) Poll() <-chan []byte {
 	if e.out == nil {
 		e.out = make(chan []byte)
 		C.gstreamer_element_pull_buffer(e.element, C.int(e.id))
@@ -206,4 +221,40 @@ func goHandleSinkBuffer(buffer unsafe.Pointer, bufferLen C.int, elementID C.int)
 		fmt.Printf("discarding buffer, no element with id %d", int(elementID))
 	}
 	C.free(buffer)
+}
+
+//export goHandleBusMessage
+func goHandleBusMessage(message *C.GstMessage, pipelineId C.int) {
+
+	msg := &Message{GstMessage: message}
+
+	if pipeline, ok := pipelines[int(pipelineId)]; ok {
+		if pipeline.messages != nil {
+			pipeline.messages <- msg
+		}
+	} else {
+		fmt.Printf("discarding message, no pipelie with id %d", int(pipelineId))
+	}
+
+	// switch (GST_MESSAGE_TYPE(msg)) {
+	// case GST_MESSAGE_EOS:
+	//     goHandleBusMessage(msg,pipelineId);
+	//     break;
+	// case GST_MESSAGE_ERROR: {
+	//     gchar *debug;
+	//     GError *error;
+	//     gst_message_parse_error(msg, &error, &debug);
+	//     g_free(debug);
+	//     g_error_free(error);
+	//     goHandleBusMessage(msg,pipelineId);
+	//     break;
+	// }
+	// case GST_MESSAGE_BUFFERING: {
+	//     goHandleBusMessage(msg,pipelineId);
+	//     break;
+	// }
+	// case GST_MESSAGE_STATE_CHANGED: {
+	//     goHandleBusMessage(msg,pipelineId);
+	//     break;
+	// }
 }

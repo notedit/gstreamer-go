@@ -10,6 +10,7 @@
 
 
 extern void goHandleSinkBuffer(void *buffer, int bufferLen, int elementId);
+extern void goHandleBusMessage(GstMessage* message, int pipelineId);
 
 static gint
 toGstMessageType(void *p) {
@@ -28,13 +29,11 @@ messageTimestamp(void *p)
 	return (GST_MESSAGE_TIMESTAMP(p));
 }
 
-
-
-void gstreamer_start_mainloop(void);
+void gstreamer_init();
 
 GstPipeline *gstreamer_create_pipeline(char *pipeline);
 
-void gstreamer_pipeline_start(GstPipeline *pipeline);
+void gstreamer_pipeline_start(GstPipeline *pipeline, int elementId);
 
 void gstreamer_pipeline_pause(GstPipeline *pipeline);
 

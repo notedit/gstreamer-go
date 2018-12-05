@@ -5,56 +5,79 @@
 #include <gst/gstcaps.h>
 
 
-GMainLoop *gstreamer_main_loop = NULL;
 
-void gstreamer_start_mainloop() {
+void gstreamer_init() {
+
     gst_init(NULL, NULL);
-    gstreamer_main_loop = g_main_loop_new(NULL, FALSE);
-    g_main_loop_run(gstreamer_main_loop);
 }
 
 
-static gboolean gstreamer_bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
-  switch (GST_MESSAGE_TYPE(msg)) {
-  case GST_MESSAGE_EOS:
-    g_print("End of stream\n");
-    exit(1);
-    break;
+	// MESSAGE_UNKNOWN       MessageType = C.GST_MESSAGE_UNKNOWN
+	// MESSAGE_EOS           MessageType = C.GST_MESSAGE_EOS
+	// MESSAGE_ERROR         MessageType = C.GST_MESSAGE_ERROR
+	// MESSAGE_TAG           MessageType = C.GST_MESSAGE_TAG
+	// MESSAGE_BUFFERING     MessageType = C.GST_MESSAGE_BUFFERING
+	// MESSAGE_STATE_CHANGED MessageType = C.GST_MESSAGE_STATE_CHANGED
+	// MESSAGE_ANY           MessageType = C.GST_MESSAGE_ANY
 
-  case GST_MESSAGE_ERROR: {
-    gchar *debug;
-    GError *error;
 
-    gst_message_parse_error(msg, &error, &debug);
-    g_free(debug);
+typedef struct BusMessageUserData {
+    int pipelineId;
+} BusMessageUserData;
 
-    g_printerr("Error: %s\n", error->message);
-    g_error_free(error);
-    exit(1);
-    break;
-  }
-  default:
-    break;
-  }
 
-  return TRUE;
+static gboolean gstreamer_bus_call(GstBus *bus, GstMessage *msg, gpointer user_data) {
+
+    BusMessageUserData *s = (BusMessageUserData *)user_data;
+    int pipelineId = s->pipelineId;
+
+    switch (GST_MESSAGE_TYPE(msg)) {
+    case GST_MESSAGE_EOS:
+        goHandleBusMessage(msg,pipelineId);
+        break;
+    case GST_MESSAGE_ERROR: {
+        gchar *debug;
+        GError *error;
+        gst_message_parse_error(msg, &error, &debug);
+        g_free(debug);
+        g_error_free(error);
+        goHandleBusMessage(msg,pipelineId);
+        break;
+    }
+    case GST_MESSAGE_BUFFERING: {
+        goHandleBusMessage(msg,pipelineId);
+        break;
+    }
+    case GST_MESSAGE_STATE_CHANGED: {
+        goHandleBusMessage(msg,pipelineId);
+        break;
+    }
+    
+    default:
+        break;
+    }
+
+    return TRUE;
 }
 
 
 GstPipeline *gstreamer_create_pipeline(char *pipelinestr) {
-
     GError *error = NULL;
     GstPipeline *pipeline = (GstPipeline*)GST_BIN(gst_parse_launch(pipelinestr, &error));
-    if (!error) {
-        g_printerr("Error: %s\n", error->message);
-        GstBus *bus = gst_pipeline_get_bus(pipeline);
-        gst_bus_add_watch(bus, gstreamer_bus_call, NULL);
-        gst_object_unref(bus);
-    }
     return pipeline;
 }
 
-void gstreamer_pipeline_start(GstPipeline *pipeline) {
+
+
+void gstreamer_pipeline_start(GstPipeline *pipeline, int pipelineId) {
+
+    BusMessageUserData *s = calloc(1, sizeof(BusMessageUserData));
+    s->pipelineId = pipelineId;
+
+    GstBus *bus = gst_pipeline_get_bus(pipeline);
+    gst_bus_add_watch(bus, gstreamer_bus_call, s);
+    gst_object_unref(bus);
+
     gst_element_set_state(GST_ELEMENT(pipeline), GST_STATE_PLAYING);
 }
 
