@@ -1,0 +1,209 @@
+package gstreamer
+
+/*
+#cgo pkg-config: gstreamer-1.0 gstreamer-app-1.0
+#include "gstreamer.h"
+*/
+import "C"
+import (
+	"errors"
+	"fmt"
+	"sync"
+	"unsafe"
+)
+
+func init() {
+	go C.gstreamer_start_mainloop()
+}
+
+type MessageType int
+
+const (
+	MESSAGE_UNKNOWN       MessageType = C.GST_MESSAGE_UNKNOWN
+	MESSAGE_EOS           MessageType = C.GST_MESSAGE_EOS
+	MESSAGE_ERROR         MessageType = C.GST_MESSAGE_ERROR
+	MESSAGE_WARNING       MessageType = C.GST_MESSAGE_WARNING
+	MESSAGE_INFO          MessageType = C.GST_MESSAGE_INFO
+	MESSAGE_TAG           MessageType = C.GST_MESSAGE_TAG
+	MESSAGE_BUFFERING     MessageType = C.GST_MESSAGE_BUFFERING
+	MESSAGE_STATE_CHANGED MessageType = C.GST_MESSAGE_STATE_CHANGED
+	MESSAGE_ANY           MessageType = C.GST_MESSAGE_ANY
+)
+
+type Message struct {
+	GstMessage *C.GstMessage
+}
+
+func (v *Message) GetType() MessageType {
+	c := C.toGstMessageType(unsafe.Pointer(v.native()))
+	return MessageType(c)
+}
+
+func (v *Message) native() *C.GstMessage {
+	if v == nil {
+		return nil
+	}
+	return v.GstMessage
+}
+
+func (v *Message) GetTimestamp() uint64 {
+	c := C.messageTimestamp(unsafe.Pointer(v.native()))
+	return uint64(c)
+}
+
+func (v *Message) GetTypeName() string {
+	c := C.messageTypeName(unsafe.Pointer(v.native()))
+	return C.GoString(c)
+}
+
+func gbool(b bool) C.gboolean {
+	if b {
+		return C.gboolean(1)
+	}
+	return C.gboolean(0)
+}
+func gobool(b C.gboolean) bool {
+	if b != 0 {
+		return true
+	}
+	return false
+}
+
+type Element struct {
+	element *C.GstElement
+	out     chan<- []byte
+	id      int
+}
+
+type Pipeline struct {
+	pipeline *C.GstPipeline
+	messages chan<- *Message
+}
+
+var elements = make(map[int]*Element)
+var gstreamerLock sync.Mutex
+var gstreamerIdGenerate = 10000
+
+func New(pipelineStr string) (*Pipeline, error) {
+	pipelineStrUnsafe := C.CString(pipelineStr)
+	defer C.free(unsafe.Pointer(pipelineStrUnsafe))
+	cpipeline := C.gstreamer_create_pipeline(pipelineStrUnsafe)
+	if cpipeline == nil {
+		return nil, errors.New("create pipeline error")
+	}
+	pipeline := &Pipeline{
+		pipeline: cpipeline,
+		messages: make(chan *Message),
+	}
+	return pipeline, nil
+}
+
+func (p *Pipeline) Start() {
+	C.gstreamer_pipeline_start(p.pipeline)
+}
+
+func (p *Pipeline) Pause() {
+	C.gstreamer_pipeline_pause(p.pipeline)
+}
+
+func (p *Pipeline) Stop() {
+	C.gstreamer_pipeline_stop(p.pipeline)
+}
+
+func (p *Pipeline) SendEOS() {
+	C.gstreamer_pipeline_sendeos(p.pipeline)
+}
+
+func (p *Pipeline) SetAutoFlushBus(flush bool) {
+	gflush := gbool(flush)
+	C.gstreamer_pipeline_set_auto_flush_bus(p.pipeline, gflush)
+}
+
+func (p *Pipeline) GetAutoFlushBus() bool {
+	gflush := C.gstreamer_pipeline_get_auto_flush_bus(p.pipeline)
+	return gobool(gflush)
+}
+
+func (p *Pipeline) GetDelay() uint64 {
+
+	delay := C.gstreamer_pipeline_get_delay(p.pipeline)
+	return uint64(delay)
+
+}
+
+func (p *Pipeline) SetDelay(delay uint64) {
+	C.gstreamer_pipeline_set_delay(p.pipeline, C.guint64(delay))
+}
+
+func (p *Pipeline) GetLatency() uint64 {
+
+	latency := C.gstreamer_pipeline_get_latency(p.pipeline)
+	return uint64(latency)
+}
+
+func (p *Pipeline) SetLatency(latency uint64) {
+	C.gstreamer_pipeline_set_latency(p.pipeline, C.guint64(latency))
+}
+
+func (p *Pipeline) FindElement(name string) *Element {
+	elementName := C.CString(name)
+	defer C.free(unsafe.Pointer(elementName))
+	gelement := C.gstreamer_pipeline_findelement(p.pipeline, elementName)
+	if gelement == nil {
+		return nil
+	}
+	element := &Element{
+		element: gelement,
+	}
+
+	gstreamerLock.Lock()
+	defer gstreamerLock.Unlock()
+	gstreamerIdGenerate += 1
+	element.id = gstreamerIdGenerate
+	elements[element.id] = element
+
+	return element
+}
+
+func (e *Element) SetCap(cap string) {
+	capStr := C.CString(cap)
+	defer C.free(unsafe.Pointer(capStr))
+	C.gstreamer_set_caps(e.element, capStr)
+}
+
+func (e *Element) Push(buffer []byte) {
+
+	b := C.CBytes(buffer)
+	defer C.free(unsafe.Pointer(b))
+	C.gstreamer_element_push_buffer(e.element, b, C.int(len(buffer)))
+}
+
+func (e *Element) Poll() chan<- []byte {
+	if e.out == nil {
+		e.out = make(chan []byte)
+		C.gstreamer_element_pull_buffer(e.element, C.int(e.id))
+	}
+	return e.out
+}
+
+func (e *Element) Stop() {
+	gstreamerLock.Lock()
+	delete(elements, e.id)
+	gstreamerLock.Unlock()
+	if e.out != nil {
+		close(e.out)
+	}
+
+}
+
+//export goHandleSinkBuffer
+func goHandleSinkBuffer(buffer unsafe.Pointer, bufferLen C.int, elementID C.int) {
+	if element, ok := elements[int(elementID)]; ok {
+		if element.out != nil {
+			element.out <- C.GoBytes(buffer, bufferLen)
+		}
+	} else {
+		fmt.Printf("discarding buffer, no element with id %d", int(elementID))
+	}
+	C.free(buffer)
+}
