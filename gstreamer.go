@@ -1,7 +1,7 @@
 package gstreamer
 
 /*
-#cgo pkg-config: gstreamer-1.0 gstreamer-app-1.0
+#cgo pkg-config: gstreamer-1.0 gstreamer-base-1.0 gstreamer-app-1.0 gstreamer-plugins-base-1.0 gstreamer-plugins-bad-1.0
 #include "gstreamer.h"
 */
 import "C"
@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	go C.gstreamer_start_mainloop()
+	C.gstreamer_start_mainloop()
 }
 
 type MessageType int

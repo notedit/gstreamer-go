@@ -1,12 +1,9 @@
 
 
 #include "gstreamer.h"
-
 #include <gst/video/video.h>
 #include <gst/gstcaps.h>
 
-#define NANOS_TO_DOUBLE(nanos)(((double)nanos)/1000000000)
-#define DOUBLE_TO_NANOS(secs)((guint64)(secs*1000000000))
 
 GMainLoop *gstreamer_main_loop = NULL;
 
@@ -45,9 +42,11 @@ static gboolean gstreamer_bus_call(GstBus *bus, GstMessage *msg, gpointer data) 
 
 
 GstPipeline *gstreamer_create_pipeline(char *pipelinestr) {
+
     GError *error = NULL;
     GstPipeline *pipeline = (GstPipeline*)GST_BIN(gst_parse_launch(pipelinestr, &error));
     if (!error) {
+        g_printerr("Error: %s\n", error->message);
         GstBus *bus = gst_pipeline_get_bus(pipeline);
         gst_bus_add_watch(bus, gstreamer_bus_call, NULL);
         gst_object_unref(bus);
