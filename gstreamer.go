@@ -96,7 +96,6 @@ func New(pipelineStr string) (*Pipeline, error) {
 
 	pipeline := &Pipeline{
 		pipeline: cpipeline,
-		messages: make(chan *Message),
 	}
 
 	gstreamerLock.Lock()
@@ -104,8 +103,13 @@ func New(pipelineStr string) (*Pipeline, error) {
 	gstreamerIdGenerate += 1
 	pipeline.id = gstreamerIdGenerate
 	pipelines[pipeline.id] = pipeline
-
 	return pipeline, nil
+}
+
+func (p *Pipeline) PullMessage() <-chan *Message {
+	p.messages = make(chan *Message)
+	C.gstreamer_pipeline_but_watch(p.pipeline, C.int(p.id))
+	return p.messages
 }
 
 func (p *Pipeline) Start() {
@@ -227,7 +231,6 @@ func goHandleSinkBuffer(buffer unsafe.Pointer, bufferLen C.int, elementID C.int)
 func goHandleBusMessage(message *C.GstMessage, pipelineId C.int) {
 
 	msg := &Message{GstMessage: message}
-
 	if pipeline, ok := pipelines[int(pipelineId)]; ok {
 		if pipeline.messages != nil {
 			pipeline.messages <- msg
@@ -236,25 +239,4 @@ func goHandleBusMessage(message *C.GstMessage, pipelineId C.int) {
 		fmt.Printf("discarding message, no pipelie with id %d", int(pipelineId))
 	}
 
-	// switch (GST_MESSAGE_TYPE(msg)) {
-	// case GST_MESSAGE_EOS:
-	//     goHandleBusMessage(msg,pipelineId);
-	//     break;
-	// case GST_MESSAGE_ERROR: {
-	//     gchar *debug;
-	//     GError *error;
-	//     gst_message_parse_error(msg, &error, &debug);
-	//     g_free(debug);
-	//     g_error_free(error);
-	//     goHandleBusMessage(msg,pipelineId);
-	//     break;
-	// }
-	// case GST_MESSAGE_BUFFERING: {
-	//     goHandleBusMessage(msg,pipelineId);
-	//     break;
-	// }
-	// case GST_MESSAGE_STATE_CHANGED: {
-	//     goHandleBusMessage(msg,pipelineId);
-	//     break;
-	// }
 }

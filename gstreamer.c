@@ -68,17 +68,17 @@ GstPipeline *gstreamer_create_pipeline(char *pipelinestr) {
 }
 
 
-
 void gstreamer_pipeline_start(GstPipeline *pipeline, int pipelineId) {
+    gst_element_set_state(GST_ELEMENT(pipeline), GST_STATE_PLAYING);
+}
 
+
+void gstreamer_pipeline_but_watch(GstPipeline *pipeline, int pipelineId) {
     BusMessageUserData *s = calloc(1, sizeof(BusMessageUserData));
     s->pipelineId = pipelineId;
-
     GstBus *bus = gst_pipeline_get_bus(pipeline);
     gst_bus_add_watch(bus, gstreamer_bus_call, s);
     gst_object_unref(bus);
-
-    gst_element_set_state(GST_ELEMENT(pipeline), GST_STATE_PLAYING);
 }
 
 void gstreamer_pipeline_pause(GstPipeline *pipeline) {

@@ -33,7 +33,9 @@ void gstreamer_init();
 
 GstPipeline *gstreamer_create_pipeline(char *pipeline);
 
-void gstreamer_pipeline_start(GstPipeline *pipeline, int elementId);
+void gstreamer_pipeline_start(GstPipeline *pipeline, int pipelineId);
+
+void gstreamer_pipeline_but_watch(GstPipeline *pipeline, int pipelineId);
 
 void gstreamer_pipeline_pause(GstPipeline *pipeline);
 
