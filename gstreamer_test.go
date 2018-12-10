@@ -68,3 +68,24 @@ func TestAppsink(t *testing.T) {
 		fmt.Println(len(buffer))
 	}
 }
+
+func TestAppsink2(t *testing.T) {
+
+	pipeline, err := New("videotestsrc ! video/x-raw,format=I420,framerate=15/1 ! x264enc bframes=0 speed-preset=veryfast key-int-max=60 ! video/x-h264,stream-format=byte-stream ! appsink name=sink")
+
+	if err != nil {
+		t.Error("pipeline create error", err)
+		t.FailNow()
+	}
+
+	appsink := pipeline.FindElement("sink")
+
+	pipeline.Start()
+
+	out := appsink.Poll()
+
+	for {
+		buffer := <-out
+		fmt.Println("push ", len(buffer))
+	}
+}
