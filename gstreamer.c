@@ -7,7 +7,6 @@
 
 
 void gstreamer_init() {
-
     gst_init(NULL, NULL);
 }
 
@@ -95,6 +94,9 @@ void gstreamer_pipeline_sendeos(GstPipeline *pipeline) {
 
 GstElement *gstreamer_pipeline_findelement(GstPipeline *pipeline, char *element) {
     GstElement *e = gst_bin_get_by_name(GST_BIN(pipeline), element);
+    if (e != NULL) {
+        gst_object_unref(e);
+    }
     return e;
 }
 
