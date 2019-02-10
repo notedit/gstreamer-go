@@ -199,7 +199,7 @@ func (e *Element) Push(buffer []byte) {
 
 func (e *Element) Poll() <-chan []byte {
 	if e.out == nil {
-		e.out = make(chan []byte)
+		e.out = make(chan []byte, 5)
 		C.gstreamer_element_pull_buffer(e.element, C.int(e.id))
 	}
 	return e.out
