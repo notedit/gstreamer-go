@@ -149,7 +149,15 @@ void gstreamer_element_push_buffer(GstElement *element, void *buffer,int len) {
     gpointer p = g_memdup(buffer, len);
     GstBuffer *data = gst_buffer_new_wrapped(p, len);
     gst_app_src_push_buffer(GST_APP_SRC(element), data);
+}
 
+
+void gstreamer_element_push_buffer_timestamp(GstElement *element, void *buffer,int len, guint64 pts) {
+    gpointer p = g_memdup(buffer, len);
+    GstBuffer *data = gst_buffer_new_wrapped(p, len);
+    GST_BUFFER_PTS(data) = pts;
+    GST_BUFFER_DTS(data) = pts;
+    gst_app_src_push_buffer(GST_APP_SRC(element), data);
 }
 
 
@@ -180,6 +188,14 @@ GstFlowReturn gstreamer_new_sample_handler(GstElement *object, gpointer user_dat
 }
 
 
+GstFlowReturn gstreamer_sink_eos_handler(GstElement *object, gpointer user_data) {
+
+    SampleHandlerUserData *s = (SampleHandlerUserData *)user_data;
+    goHandleSinkEOS(s->elementId);
+    return GST_FLOW_OK; 
+}
+
+
 void gstreamer_element_pull_buffer(GstElement *element, int elementId) {
 
     SampleHandlerUserData *s = calloc(1, sizeof(SampleHandlerUserData));
@@ -187,7 +203,8 @@ void gstreamer_element_pull_buffer(GstElement *element, int elementId) {
     s->elementId = elementId;
 
     g_object_set(element, "emit-signals", TRUE, NULL);
-    g_signal_connect(element, "new-sample", G_CALLBACK(gstreamer_new_sample_handler), s);   
+    g_signal_connect(element, "new-sample", G_CALLBACK(gstreamer_new_sample_handler), s);  
+    g_signal_connect(element, "eos", G_CALLBACK(gstreamer_sink_eos_handler), s); 
 }
 
 

@@ -11,6 +11,8 @@
 
 extern void goHandleSinkBuffer(void *buffer, int bufferLen, int elementId);
 extern void goHandleBusMessage(GstMessage* message, int pipelineId);
+extern void goHandleSinkEOS(int elementId);
+
 
 static gint
 toGstMessageType(void *p) {
@@ -60,6 +62,8 @@ GstClockTime gstreamer_pipeline_get_latency(GstPipeline *pipeline);
 void gstreamer_set_caps(GstElement *element, char *caps);
 
 void gstreamer_element_push_buffer(GstElement *element, void *buffer,int len);
+
+void gstreamer_element_push_buffer_timestamp(GstElement *element, void *buffer,int len, guint64 pts);
 
 void gstreamer_element_pull_buffer(GstElement *element, int elementId);
 

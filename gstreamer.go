@@ -72,6 +72,7 @@ func gobool(b C.gboolean) bool {
 type Element struct {
 	element *C.GstElement
 	out     chan []byte
+	stop    bool
 	id      int
 }
 
@@ -107,7 +108,7 @@ func New(pipelineStr string) (*Pipeline, error) {
 }
 
 func (p *Pipeline) PullMessage() <-chan *Message {
-	p.messages = make(chan *Message)
+	p.messages = make(chan *Message, 5)
 	C.gstreamer_pipeline_but_watch(p.pipeline, C.int(p.id))
 	return p.messages
 }
@@ -197,9 +198,15 @@ func (e *Element) Push(buffer []byte) {
 	C.gstreamer_element_push_buffer(e.element, b, C.int(len(buffer)))
 }
 
+func (e *Element) Push2(buffer []byte, pts uint64) {
+	b := C.CBytes(buffer)
+	defer C.free(unsafe.Pointer(b))
+	C.gstreamer_element_push_buffer_timestamp(e.element, b, C.int(len(buffer)), C.guint64(pts))
+}
+
 func (e *Element) Poll() <-chan []byte {
 	if e.out == nil {
-		e.out = make(chan []byte, 5)
+		e.out = make(chan []byte, 10)
 		C.gstreamer_element_pull_buffer(e.element, C.int(e.id))
 	}
 	return e.out
@@ -209,7 +216,11 @@ func (e *Element) Stop() {
 	gstreamerLock.Lock()
 	delete(elements, e.id)
 	gstreamerLock.Unlock()
+	if e.stop {
+		return
+	}
 	if e.out != nil {
+		e.stop = true
 		close(e.out)
 	}
 
@@ -217,8 +228,10 @@ func (e *Element) Stop() {
 
 //export goHandleSinkBuffer
 func goHandleSinkBuffer(buffer unsafe.Pointer, bufferLen C.int, elementID C.int) {
+	gstreamerLock.Lock()
+	defer gstreamerLock.Unlock()
 	if element, ok := elements[int(elementID)]; ok {
-		if element.out != nil {
+		if element.out != nil && !element.stop {
 			element.out <- C.GoBytes(buffer, bufferLen)
 		}
 	} else {
@@ -227,9 +240,22 @@ func goHandleSinkBuffer(buffer unsafe.Pointer, bufferLen C.int, elementID C.int)
 	C.free(buffer)
 }
 
+//export goHandleSinkEOS
+func goHandleSinkEOS(elementID C.int) {
+	gstreamerLock.Lock()
+	defer gstreamerLock.Unlock()
+	if element, ok := elements[int(elementID)]; ok {
+		if element.out != nil && !element.stop {
+			element.stop = true
+			close(element.out)
+		}
+	}
+}
+
 //export goHandleBusMessage
 func goHandleBusMessage(message *C.GstMessage, pipelineId C.int) {
-
+	gstreamerLock.Lock()
+	defer gstreamerLock.Unlock()
 	msg := &Message{GstMessage: message}
 	if pipeline, ok := pipelines[int(pipelineId)]; ok {
 		if pipeline.messages != nil {
