@@ -198,12 +198,6 @@ func (e *Element) Push(buffer []byte) {
 	C.gstreamer_element_push_buffer(e.element, b, C.int(len(buffer)))
 }
 
-func (e *Element) Push2(buffer []byte, pts uint64) {
-	b := C.CBytes(buffer)
-	defer C.free(unsafe.Pointer(b))
-	C.gstreamer_element_push_buffer_timestamp(e.element, b, C.int(len(buffer)), C.guint64(pts))
-}
-
 func (e *Element) Poll() <-chan []byte {
 	if e.out == nil {
 		e.out = make(chan []byte, 10)
