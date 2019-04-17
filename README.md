@@ -3,6 +3,33 @@ gstreamer simple wrap for golang
 
 
 
+## Install 
+
+
+Ubuntu or Dedian
+
+```
+apt-get install libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav
+```
+
+Mac os
+
+```
+brew install gstreamer
+brew install gst-plugins-base
+brew install gst-plugins-good
+brew install gst-plugins-bad
+brew install gst-plugins-ugly
+```
+
+
+Then
+
+```
+go get github.com/notedit/gstreamer-go
+```
+
+
 ## How to use
 
 ```
