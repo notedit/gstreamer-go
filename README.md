@@ -8,14 +8,14 @@ gstreamer simple wrap for golang
 
 Ubuntu or Dedian
 
-```
+```sh
 apt-get install pkg-config
 apt-get install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-good1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-ugly gstreamer1.0-libav
 ```
 
 Mac os
 
-```
+```sh
 brew install gstreamer
 brew install gst-plugins-base
 brew install gst-plugins-good
@@ -25,14 +25,14 @@ brew install gst-plugins-ugly
 
 Then
 
-```
+```sh
 go get github.com/notedit/gstreamer-go
 ```
 
 
 ## How to use
 
-```
+```go
 pipeline, err := New("videotestsrc  ! capsfilter name=filter ! autovideosink")
 if err != nil {
     t.Error("pipeline create error", err)
@@ -54,7 +54,7 @@ pipeline.Start()
 
 ## Send Media data to pipeline
 
-```
+```go
 pipeline, err := New("appsrc name=mysource format=time is-live=true do-timestamp=true ! videoconvert ! autovideosink")
 
 if err != nil {
@@ -80,7 +80,7 @@ push raw rgb data to the pipeline
 
 ## Poll Media data from pipeline 
 
-```
+```go
 pipeline, err := New("videotestsrc ! video/x-raw,format=I420,framerate=15/1 ! x264enc bframes=0 speed-preset=veryfast key-int-max=60 ! video/x-h264,stream-format=byte-stream ! appsink name=sink")
 
 if err != nil {
@@ -103,5 +103,18 @@ for {
 now we can get the h264 raw data from the pipeline 
 
 
+## Check Plugins does exist
+
+```go
+	
+plugins := []string{"videotestsrc", "audiotestsrc", "rtp", "curl","x264", "rtmp"}
+
+err := CheckPlugins(plugins)
+
+if err != nil {
+    panic(err)
+}
+
+```
 
 
