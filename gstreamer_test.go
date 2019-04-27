@@ -89,3 +89,15 @@ func TestAppsink2(t *testing.T) {
 		fmt.Println("push ", len(buffer))
 	}
 }
+
+func TestCheckPlugins(t *testing.T) {
+	
+	plugins := []string{"videotestsrc", "audiotestsrc", "rtp", "curl","x264", "rtmp"}
+
+	err := CheckPlugins(plugins)
+
+	if err != nil {
+		t.Error("pipeline create error", err)
+		t.FailNow()
+	}
+}
