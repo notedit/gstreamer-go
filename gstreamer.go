@@ -261,19 +261,24 @@ func goHandleBusMessage(message *C.GstMessage, pipelineId C.int) {
 
 }
 
+// ScanPathForPlugins : Scans a given path for any gstreamer plugins and adds them to
+// the gst_registry
+func ScanPathForPlugins(directory string) {
+	C.gst_registry_scan_path(C.gst_registry_get(), C.CString(directory))
+}
 
 func CheckPlugins(plugins []string) error {
-	
+
 	var plugin *C.GstPlugin
 	var registry *C.GstRegistry
 
 	registry = C.gst_registry_get()
 
-	for _,pluginstr := range plugins {
+	for _, pluginstr := range plugins {
 		plugincstr := C.CString(pluginstr)
-		plugin = C.gst_registry_find_plugin(registry,plugincstr)
+		plugin = C.gst_registry_find_plugin(registry, plugincstr)
 		C.free(unsafe.Pointer(plugincstr))
-		if plugin == nil  {
+		if plugin == nil {
 			return fmt.Errorf("Required gstreamer plugin %s not found", pluginstr)
 		}
 	}
