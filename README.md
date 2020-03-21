@@ -2,6 +2,7 @@
 gstreamer simple wrap for golang
 
 
+## You can also try https://github.com/notedit/gst
 
 ## Install 
 
